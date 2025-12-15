@@ -1,7 +1,6 @@
 import { Transaction, Asset } from '../types';
 
-const API_URL = 'https://fin.noristic.com/api';
-
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const getHeaders = () => {
     const token = localStorage.getItem('token');
     return {
@@ -30,7 +29,7 @@ export const api = {
             if (!res.ok) throw new Error((await res.json()).message || 'Erreur inscription');
             return res.json();
         },
-	changePassword: async (currentPassword: string, newPassword: string) => {
+        changePassword: async (currentPassword: string, newPassword: string) => {
             const res = await fetch(`${API_URL}/auth/change-password`, {
                 method: 'POST',
                 headers: getHeaders(),
@@ -96,27 +95,27 @@ export const api = {
         }
     },
     currentAccount: {
-      get: async () => {
-        const res = await fetch(`${API_URL}/current-account`, { headers: getHeaders() });
-        if (!res.ok) throw new Error('Erreur chargement compte courant');
-        return res.json();
-      },
-      manualUpdate: async (balance: number) => {
-        const res = await fetch(`${API_URL}/current-account/manual`, {
-          method: 'POST',
-          headers: getHeaders(),
-          body: JSON.stringify({ balance })
-        });
-        if (!res.ok) throw new Error('Erreur mise à jour manuelle');
-        return res.json();
-      },
-      autoUpdate: async () => {
-        const res = await fetch(`${API_URL}/current-account/auto`, {
-          method: 'POST',
-          headers: getHeaders()
-        });
-        if (!res.ok) throw new Error('Erreur mise à jour automatique');
-        return res.json();
-      }
+        get: async () => {
+            const res = await fetch(`${API_URL}/current-account`, { headers: getHeaders() });
+            if (!res.ok) throw new Error('Erreur chargement compte courant');
+            return res.json();
+        },
+        manualUpdate: async (balance: number) => {
+            const res = await fetch(`${API_URL}/current-account/manual`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ balance })
+            });
+            if (!res.ok) throw new Error('Erreur mise à jour manuelle');
+            return res.json();
+        },
+        autoUpdate: async () => {
+            const res = await fetch(`${API_URL}/current-account/auto`, {
+                method: 'POST',
+                headers: getHeaders()
+            });
+            if (!res.ok) throw new Error('Erreur mise à jour automatique');
+            return res.json();
+        }
     }
-  };
+};
