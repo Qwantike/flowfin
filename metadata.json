@@ -1,0 +1,5 @@
+{
+  "name": "FlowFin - Financial Visualizer",
+  "description": "A modern React application to visualize monthly financial flows using a centralized Sankey-like diagram.",
+  "requestFramePermissions": []
+}
