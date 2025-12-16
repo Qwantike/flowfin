@@ -136,17 +136,28 @@ export const getCurrentAccount = async (req, res) => {
 };
 
 export const manualUpdateCurrentAccount = async (req, res) => {
-  const { balance } = req.body;
+  const { balance, date } = req.body; // accept optional date
   if (balance === undefined || balance === null) return res.status(400).json({ message: 'balance requis' });
+
+  // If date provided use it, else CURRENT_DATE
+  const updateDateQuery = date ? '$3' : 'CURRENT_DATE';
+  const params = date ? [balance, req.user.id, date] : [balance, req.user.id];
+
   try {
     // upsert: try update, else insert
     const up = await db.query(
-      'UPDATE current_accounts SET balance = $1, last_update_at = CURRENT_DATE WHERE user_id = $2 RETURNING *',
-      [balance, req.user.id]
+      `UPDATE current_accounts SET balance = $1, last_update_at = ${updateDateQuery} WHERE user_id = $2 RETURNING *`,
+      params
     );
     let row;
     if (up.rows.length === 0) {
-      const ins = await db.query('INSERT INTO current_accounts (user_id, balance, last_update_at) VALUES ($1, $2, CURRENT_DATE) RETURNING *', [req.user.id, balance]);
+      // For insert, we need strict params count
+      const insertQuery = date
+        ? 'INSERT INTO current_accounts (user_id, balance, last_update_at) VALUES ($1, $2, $3) RETURNING *'
+        : 'INSERT INTO current_accounts (user_id, balance, last_update_at) VALUES ($1, $2, CURRENT_DATE) RETURNING *';
+
+      const insertParams = date ? [req.user.id, balance, date] : [req.user.id, balance];
+      const ins = await db.query(insertQuery, insertParams);
       row = ins.rows[0];
     } else {
       row = up.rows[0];
@@ -172,7 +183,7 @@ export const autoUpdateCurrentAccount = async (req, res) => {
 
     const lastUpdate = account.last_update_at;
 
-    // Sum net effect of transactions after last_update_at up to today
+    // Sum net effect of transactions STRICTLY AFTER last_update_at up to today
     const sumRes = await db.query(
       `SELECT COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END), 0) AS net
        FROM transactions
@@ -182,17 +193,18 @@ export const autoUpdateCurrentAccount = async (req, res) => {
 
     const net = sumRes.rows[0]?.net !== null ? parseFloat(sumRes.rows[0].net) : 0;
 
-    if (net === 0) {
-      // nothing to apply; still update last_update_at to today
-      const upd = await db.query('UPDATE current_accounts SET last_update_at = CURRENT_DATE WHERE user_id = $1 RETURNING *', [req.user.id]);
-      const row = upd.rows[0];
-      return res.json({ balance: row.balance !== null ? parseFloat(row.balance) : 0, last_update_at: row.last_update_at });
-    }
-
+    // Even if net is 0, we assume the check was done up to today, so we update the cursor (last_update_at)
+    // This prevents re-checking old dates unnecessarily.
     const newBal = parseFloat(account.balance) + net;
+
     const up2 = await db.query('UPDATE current_accounts SET balance = $1, last_update_at = CURRENT_DATE WHERE user_id = $2 RETURNING *', [newBal, req.user.id]);
     const row = up2.rows[0];
-    return res.json({ balance: row.balance !== null ? parseFloat(row.balance) : 0, last_update_at: row.last_update_at, applied: net });
+
+    return res.json({
+      balance: row.balance !== null ? parseFloat(row.balance) : 0,
+      last_update_at: row.last_update_at,
+      applied: net
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur mise à jour automatique' });

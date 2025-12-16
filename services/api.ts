@@ -1,6 +1,6 @@
 import { Transaction, Asset } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api';
 const getHeaders = () => {
     const token = localStorage.getItem('token');
     return {
@@ -100,11 +100,11 @@ export const api = {
             if (!res.ok) throw new Error('Erreur chargement compte courant');
             return res.json();
         },
-        manualUpdate: async (balance: number) => {
+        manualUpdate: async (balance: number, date?: string) => {
             const res = await fetch(`${API_URL}/current-account/manual`, {
                 method: 'POST',
                 headers: getHeaders(),
-                body: JSON.stringify({ balance })
+                body: JSON.stringify({ balance, date })
             });
             if (!res.ok) throw new Error('Erreur mise à jour manuelle');
             return res.json();

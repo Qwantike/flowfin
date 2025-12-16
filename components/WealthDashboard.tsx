@@ -3,22 +3,21 @@ import * as d3 from 'd3';
 import { Asset, AssetCategory } from '../types';
 import { AssetForm } from './AssetForm';
 import { AssetList } from './AssetList';
-import { PieChart, Landmark, TrendingUp } from 'lucide-react';
+import { PieChart, Landmark, TrendingUp, Wallet } from 'lucide-react';
 import { api } from '../services/api';
 
 interface WealthDashboardProps {
     externalAssets?: Asset[];
     onAssetsChange?: (assets: Asset[]) => void;
+    currentAccountBalance?: number;
 }
 
-export const WealthDashboard: React.FC<WealthDashboardProps> = ({ externalAssets, onAssetsChange }) => {
+export const WealthDashboard: React.FC<WealthDashboardProps> = ({ externalAssets, onAssetsChange, currentAccountBalance = 0 }) => {
     // Use external state if provided, otherwise local state (fallback)
     const [localAssets, setLocalAssets] = useState<Asset[]>([]);
 
     const assets = externalAssets || localAssets;
     const setAssets = onAssetsChange || setLocalAssets;
-
-    // No initial data load here if passed from App, but we need add/remove handlers
 
     const addAsset = async (newAsset: Omit<Asset, 'id'>) => {
         try {
@@ -56,12 +55,13 @@ export const WealthDashboard: React.FC<WealthDashboardProps> = ({ externalAssets
     };
 
     const stats = useMemo(() => {
-        let grossWealth = 0;
+        // Start with current account balance
+        let grossWealth = currentAccountBalance;
         let totalDebt = 0;
         let projectedAnnualIncome = 0;
 
         const distribution = {
-            [AssetCategory.LIQUIDITY]: 0,
+            [AssetCategory.LIQUIDITY]: currentAccountBalance, // Add to liquidity
             [AssetCategory.INVESTMENT]: 0,
             [AssetCategory.REAL_ESTATE]: 0,
             [AssetCategory.CRYPTO]: 0,
@@ -88,7 +88,17 @@ export const WealthDashboard: React.FC<WealthDashboardProps> = ({ externalAssets
             projectedAnnualIncome,
             distribution
         };
-    }, [assets]);
+    }, [assets, currentAccountBalance]);
+
+    const getLabel = (key: string) => {
+        switch (key) {
+            case AssetCategory.REAL_ESTATE: return 'Immobilier';
+            case AssetCategory.LIQUIDITY: return 'Liquidité';
+            case AssetCategory.INVESTMENT: return 'Investissement';
+            case AssetCategory.CRYPTO: return 'Crypto';
+            default: return key;
+        }
+    };
 
     // Donut Chart Logic using D3
     const DonutChart = () => {
@@ -132,9 +142,7 @@ export const WealthDashboard: React.FC<WealthDashboardProps> = ({ externalAssets
                             />
                         ))}
                         <text textAnchor="middle" dy="-12" className="text-xs fill-slate-400 font-medium uppercase tracking-wider">
-                            {hovered
-                                ? (hovered.key === 'REAL_ESTATE' ? 'Immo' : hovered.key === 'LIQUIDITY' ? 'Cash' : hovered.key === 'INVESTMENT' ? 'Bourse' : 'Crypto')
-                                : 'TOTAL BRUT'}
+                            {hovered ? getLabel(hovered.key) : 'TOTAL BRUT'}
                         </text>
                         <text textAnchor="middle" dy="16" className="text-lg font-bold fill-white">
                             {hovered
@@ -149,7 +157,7 @@ export const WealthDashboard: React.FC<WealthDashboardProps> = ({ externalAssets
                         <div key={d.key} className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[d.key] }}></div>
                             <div className="text-xs text-slate-300">
-                                {d.key === 'REAL_ESTATE' ? 'Immo' : d.key === 'LIQUIDITY' ? 'Cash' : d.key === 'INVESTMENT' ? 'Bourse' : 'Crypto'}
+                                {getLabel(d.key)}
                                 <span className="ml-1 text-slate-500">{Math.round((d.val / stats.grossWealth) * 100)}%</span>
                             </div>
                         </div>
@@ -171,7 +179,7 @@ export const WealthDashboard: React.FC<WealthDashboardProps> = ({ externalAssets
 
         // compute net per category
         const netDistribution: Record<string, number> = {
-            [AssetCategory.LIQUIDITY]: 0,
+            [AssetCategory.LIQUIDITY]: currentAccountBalance, // Current account is fully liquid/net (usually)
             [AssetCategory.INVESTMENT]: 0,
             [AssetCategory.REAL_ESTATE]: 0,
             [AssetCategory.CRYPTO]: 0,
@@ -216,9 +224,7 @@ export const WealthDashboard: React.FC<WealthDashboardProps> = ({ externalAssets
                             />
                         ))}
                         <text textAnchor="middle" dy="-12" className="text-xs fill-slate-400 font-medium uppercase tracking-wider">
-                            {hovered
-                                ? (hovered.key === 'REAL_ESTATE' ? 'Immo' : hovered.key === 'LIQUIDITY' ? 'Cash' : hovered.key === 'INVESTMENT' ? 'Bourse' : 'Crypto')
-                                : 'TOTAL NET'}
+                            {hovered ? getLabel(hovered.key) : 'TOTAL NET'}
                         </text>
                         <text textAnchor="middle" dy="16" className="text-lg font-bold fill-white">
                             {hovered
@@ -233,7 +239,7 @@ export const WealthDashboard: React.FC<WealthDashboardProps> = ({ externalAssets
                         <div key={d.key} className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[d.key] }}></div>
                             <div className="text-xs text-slate-300">
-                                {d.key === 'REAL_ESTATE' ? 'Immo' : d.key === 'LIQUIDITY' ? 'Cash' : d.key === 'INVESTMENT' ? 'Bourse' : 'Crypto'}
+                                {getLabel(d.key)}
                                 <span className="ml-1 text-slate-500">{stats.netWealth > 0 ? Math.round((d.val / stats.netWealth) * 100) : 0}%</span>
                             </div>
                         </div>
@@ -306,19 +312,51 @@ export const WealthDashboard: React.FC<WealthDashboardProps> = ({ externalAssets
                 <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-6">
                     <h3 className="text-lg font-semibold text-white mb-4">Analyse</h3>
                     <p className="text-slate-400 text-sm leading-relaxed">
-                        Votre ratio d'endettement est de <strong className="text-white">{Math.round((stats.totalDebt / stats.grossWealth) * 100) || 0}%</strong>.
+                        Votre ratio d'endettement est de <strong className="text-white">{stats.grossWealth > 0 ? Math.round((stats.totalDebt / stats.grossWealth) * 100) : 0}%</strong>.
                         {stats.netWealth > 0 && (
                             <span> Votre patrimoine net représente <strong className="text-white">{Math.round((stats.netWealth / stats.grossWealth) * 100)}%</strong> de vos avoirs.</span>
                         )}
                         <br />
-                        Le rendement passif moyen de votre patrimoine brut est de <strong className="text-emerald-400">{((stats.projectedAnnualIncome / stats.grossWealth) * 100).toFixed(2) || 0}%</strong>.
+                        Le rendement passif moyen de votre patrimoine brut est de <strong className="text-emerald-400">{stats.grossWealth > 0 ? ((stats.projectedAnnualIncome / stats.grossWealth) * 100).toFixed(2) : 0}%</strong>.
                     </p>
                 </div>
             </div>
 
             <div className="lg:col-span-4 flex flex-col gap-6">
                 <AssetForm onAdd={addAsset} />
-                <AssetList assets={assets} onRemove={removeAsset} />
+
+                <div className="mt-2 space-y-4">
+                    <h3 className="text-lg font-semibold text-white px-1">Détail des Actifs</h3>
+
+                    {/* Integrated Current Account Card */}
+                    <div className="bg-slate-800/50 backdrop-blur-md rounded-xl p-4 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)] hover:border-indigo-500/40 transition-all">
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 bg-slate-900 rounded-lg mt-1">
+                                    <Wallet className="w-5 h-5 text-emerald-400" />
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-slate-200">Compte Courant</h4>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
+                                            Liquidité
+                                        </span>
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300">
+                                            Synchronisé
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-lg font-bold text-white">
+                                    {currentAccountBalance.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <AssetList assets={assets} onRemove={removeAsset} />
+                </div>
             </div>
         </div>
     );

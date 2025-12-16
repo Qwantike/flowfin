@@ -48,6 +48,7 @@ function App() {
   const [currentTab, setCurrentTab] = useState<'FLOWS' | 'WEALTH'>('FLOWS');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]); // We need to lift Asset state to App too for full API integration
+  const [currentAccount, setCurrentAccount] = useState<{ balance: number } | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'MONTH' | 'YEAR'>('MONTH');
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -68,18 +69,27 @@ function App() {
     }
   }, [isAuthenticated]);
 
+  // Refresh data when switching to WEALTH tab to ensure Current Account is up to date
+  useEffect(() => {
+    if (isAuthenticated && currentTab === 'WEALTH') {
+      loadData();
+    }
+  }, [currentTab, isAuthenticated]);
+
   const loadData = async () => {
     setIsLoadingData(true);
     try {
-      const [txData, assetData] = await Promise.all([
+      const [txData, assetData, accountData] = await Promise.all([
         api.transactions.getAll(),
-        api.assets.getAll()
+        api.assets.getAll(),
+        api.currentAccount.get()
       ]);
       setTransactions(txData);
       setAssets(assetData);
-    } catch (e) {
+      setCurrentAccount(accountData);
+    } catch (e: any) {
       console.error("Erreur chargement données", e);
-      if (e.message.includes('401')) logout();
+      if (e.message && e.message.includes('401')) logout();
     } finally {
       setIsLoadingData(false);
     }
@@ -91,6 +101,7 @@ function App() {
     setIsAuthenticated(false);
     setTransactions([]);
     setAssets([]);
+    setCurrentAccount(null);
   };
 
   // --- ACTIONS ---
@@ -113,19 +124,6 @@ function App() {
       console.error("Erreur suppression", e);
     }
   };
-
-  // Note: WealthDashboard manages its own assets state in previous version.
-  // Ideally, we refactor WealthDashboard to accept assets as props.
-  // For this transition, we will modify WealthDashboard locally inside its file 
-  // OR we can leave WealthDashboard using the API directly if we wanted, 
-  // but to keep App as source of truth, let's assume we will pass props down 
-  // (Requires modifying WealthDashboard, which I will do below).
-
-  // Actually, to avoid breaking WealthDashboard signature in this specific file update if I don't change WealthDashboard file:
-  // I will check if I am updating WealthDashboard in this prompt. I am not (in the XML list above).
-  // Wait, I MUST update WealthDashboard to use API or accept props.
-  // Since I can update multiple files, I will update WealthDashboard as well to receive props or use API.
-  // Using Props is cleaner React.
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -263,9 +261,6 @@ function App() {
                 {/* Date Navigation */}
                 <MonthSelector currentDate={currentDate} onChange={setCurrentDate} viewMode={viewMode} />
 
-                {/* Top Summary Stats */}
-                {/* <SummaryCards totalIncome={totals.income} totalExpense={totals.expense} /> */}
-
                 {/* Dashboard Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
 
@@ -275,7 +270,7 @@ function App() {
                     <div className="mt-4">
                       <CurrentAccountCard />
                     </div>
-		    <div className="mt-6 h-[650px]">
+                    <div className="mt-6 h-[650px]">
                       <FinancialFlowChart transactions={filteredTransactions} />
                     </div>
                   </div>
@@ -289,12 +284,11 @@ function App() {
                 </div>
               </div>
             ) : (
-              // We modify WealthDashboard to accept props to avoid double fetching
-              // However, for this step, I will need to update WealthDashboard component to accept props first.
-              // For now, let's assume WealthDashboard is updated to accept optional props, 
-              // OR we just let WealthDashboard fetch its own data for now?
-              // Better practice: Pass data down.
-              <WealthDashboard externalAssets={assets} onAssetsChange={setAssets} />
+              <WealthDashboard
+                externalAssets={assets}
+                onAssetsChange={setAssets}
+                currentAccountBalance={currentAccount?.balance || 0}
+              />
             )}
           </>
         )}
