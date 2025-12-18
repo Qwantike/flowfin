@@ -231,7 +231,7 @@ function App() {
           <div className={`flex bg-slate-800/80 rounded-lg p-1 border border-slate-700 transition-opacity duration-300 ${currentTab === 'FLOWS' ? 'opacity-100' : 'opacity-0 pointer-events-none hidden sm:flex'}`}>
             <button
               onClick={() => setViewMode('MONTH')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'MONTH' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'MONTH' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:white'}`}
             >
               <LayoutDashboard className="w-4 h-4" />
               Mois
@@ -266,7 +266,7 @@ function App() {
 
                   {/* Left Column: charts & summary */}
                   <div className="lg:col-span-8">
-                    <SummaryCards totalIncome={totals.income} totalExpense={totals.expense} />
+                    <SummaryCards totalIncome={totals.income} totalExpense={totals.expense} viewMode={viewMode} />
                     <div className="mt-4">
                       <CurrentAccountCard />
                     </div>
